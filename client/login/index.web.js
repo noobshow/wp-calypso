@@ -11,6 +11,7 @@ import {
 	magicLoginUse,
 	redirectJetpack,
 	redirectDefaultLocale,
+	setShouldServerSideRenderLogin,
 } from './controller';
 import { makeLayout, redirectLoggedIn, setUpLocale } from 'controller';
 
@@ -40,6 +41,7 @@ export default router => {
 			redirectDefaultLocale,
 			setUpLocale,
 			login,
+			setShouldServerSideRenderLogin,
 			makeLayout
 		);
 	}

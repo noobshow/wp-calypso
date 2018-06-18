@@ -7,7 +7,7 @@ import React from 'react';
 import ReactDomServer from 'react-dom/server';
 import superagent from 'superagent';
 import Lru from 'lru';
-import { get, intersection, pick } from 'lodash';
+import { get, pick } from 'lodash';
 import debugFactory from 'debug';
 
 /**
@@ -123,20 +123,6 @@ export function render( element, key = JSON.stringify( element ), req ) {
 	//todo: render an error?
 }
 
-/**
- * Check a query object against an array of whitelisted keys.
- *
- * If any key in the query is not present in the whitelist, it is not cacheable.
- *
- * @param  {Object}        [query={}]                Query object
- * @param  {Array<string>} [whitelistedQueryKeys=[]] Whitelisted keys
- * @return {boolean}                                 True if all query keys are whitelisted
- */
-export function isCacheableQuery( query = {}, whitelistedQueryKeys = [] ) {
-	const queryKeys = Object.keys( query );
-	return queryKeys.length === intersection( queryKeys, whitelistedQueryKeys ).length;
-}
-
 export function serverRender( req, res ) {
 	const context = req.context;
 
@@ -145,26 +131,13 @@ export function serverRender( req, res ) {
 		links = [],
 		cacheKey = false;
 
-	if (
-		isSectionIsomorphic( context.store.getState() ) &&
-		! context.user &&
-		isCacheableQuery( context.query, context.cacheQueryKeys )
-	) {
-		cacheKey = getNormalizedPath( context.pathname, context.query );
-	}
-
 	if ( ! isDefaultLocale( context.lang ) ) {
 		const langFileName = getCurrentLocaleVariant( context.store.getState() ) || context.lang;
 		context.i18nLocaleScript = '//widgets.wp.com/languages/calypso/' + langFileName + '.js';
 	}
 
-	if (
-		config.isEnabled( 'server-side-rendering' ) &&
-		context.layout &&
-		! context.user &&
-		cacheKey &&
-		isDefaultLocale( context.lang )
-	) {
+	if ( shouldServerSideRender( context ) ) {
+		cacheKey = getNormalizedPath( context.pathname, context.query );
 		context.renderedLayout = render(
 			context.layout,
 			req.error ? req.error.message : cacheKey,
@@ -225,4 +198,58 @@ export function serverRenderError( err, req, res, next ) {
 	}
 
 	next();
+}
+
+/**
+ * A generic middleware that identifies if the current request fits the conditions for being SSRable.
+ *
+ * Warning: Having serverSideRender=true is not sufficient. The app-level logic needs be applied before truly SSRing.
+ *
+ * @param {object}   context  The entire request context
+ * @param {function} next     As all middlewares, will call next in the sequence
+ */
+export function setShouldServerSideRender( context, next ) {
+	context.serverSideRender = Object.keys( context.query ).length === 0; // 0 query parameters expected
+
+	next();
+}
+
+/**
+ * Applies all the app-related checks for server side rendering.
+ *
+ * Warning: If this returns true, it is not sufficient for the page to be SSRed. Returning true from here is a
+ * pre-condition for SSR and the result needs to be corroborated with context.serverSideRender
+ * (context.serverSideRender is set to boolean by the middlewares, depending, in general, on the query params).
+ *
+ * Warning: if you think about calling this method or adding these conditions to the middlewares themselves (the ones
+ * that set context.serverSideRender), think twice: the context may not have all the necessary values;
+ * examples: context.layout, context.user may be set by other middlewares).
+ *
+ * @param {object}   context The currently built context
+ *
+ * @return {boolean} True if all the app-level criteria is fulfilled.
+ */
+function isServerSideRenderCandidate( context ) {
+	return (
+		isSectionIsomorphic( context.store.getState() ) &&
+		! context.user && // logged out only
+		isDefaultLocale( context.lang ) &&
+		context.layout
+	);
+}
+
+/**
+ * The main entry point for server-side rendering checks, and the final authority of if a page should be SSRed.
+ *
+ * Warning: the context needs to be 'ready' for these checks (needs to have all values)
+ *
+ * @param {object}   context The currently built context
+ * @return {boolean} if the current page/request should return a SSR response
+ */
+function shouldServerSideRender( context ) {
+	return (
+		config.isEnabled( 'server-side-rendering' ) &&
+		isServerSideRenderCandidate( context ) &&
+		context.serverSideRender === true
+	);
 }
