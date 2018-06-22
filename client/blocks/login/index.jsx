@@ -8,10 +8,11 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import Gridicon from 'gridicons';
-import { includes, capitalize } from 'lodash';
+import { includes, capitalize, last } from 'lodash';
 import { localize } from 'i18n-calypso';
 import page from 'page';
 import classNames from 'classnames';
+import store from 'store';
 
 /**
  * Internal dependencies
@@ -128,10 +129,25 @@ class Login extends Component {
 		// Redirects to / if no redirect url is available
 		const url = redirectTo ? redirectTo : window.location.origin;
 
+		// For a seamless signup experience, the site creation data
+		// should be restored when users log in to WordPress.com
+		const signupFlowName = store.get( 'signupFlowName' );
+		const signupProgress = store.get( 'signupProgress' );
+
 		// user data is persisted in localstorage at `lib/user/user` line 157
 		// therefor we need to reset it before we redirect, otherwise we'll get
 		// mixed data from old and new user
-		user.clear( () => ( window.location.href = url ) );
+		user.clear( () => {
+			if ( signupFlowName && signupProgress ) {
+				const lastStep = last( signupProgress );
+				if ( lastStep && lastStep.stepName === 'user' ) {
+					signupProgress.pop();
+				}
+				store.set( 'signupFlowName', signupFlowName );
+				store.set( 'signupProgress', signupProgress );
+			}
+			window.location.href = url;
+		} );
 	};
 
 	renderHeader() {
