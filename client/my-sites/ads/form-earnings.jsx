@@ -7,6 +7,7 @@
 import React, { Component } from 'react';
 import notices from 'notices';
 import classNames from 'classnames';
+import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 
 /**
@@ -14,93 +15,32 @@ import { localize } from 'i18n-calypso';
  */
 import Card from 'components/card';
 import Gridicon from 'gridicons';
-import WordadsActions from 'lib/ads/actions';
-import EarningsStore from 'lib/ads/earnings-store';
+import { requestWordadsEarnings } from 'state/wordads/earnings/actions';
+import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
+import {
+	isRequestingWordadsEarnings,
+	getWordAdsEarningsForSite,
+} from 'state/wordads/earnings/selectors';
+import QueryWordadsEarnings from 'components/data/query-wordads-earnings';
 
 class AdsFormEarnings extends Component {
-	state = this.getSettingsFromStore();
-
-	componentDidMount() {
-		EarningsStore.on( 'change', this.updateSettings );
-		this.fetchIfEmpty();
-	}
-
-	componentWillUnmount() {
-		EarningsStore.removeListener( 'change', this.updateSettings );
-	}
-
-	componentDidUpdate() {
-		if ( this.state.error && this.state.error.message ) {
-			notices.error( this.state.error.message );
-		} else {
-			notices.clearNotices( 'notices' );
-		}
-	}
-
-	componentWillReceiveProps( nextProps ) {
-		if ( ! EarningsStore.getById( nextProps.site.ID ).earnings ) {
-			this.resetState();
-		}
-
-		if ( this.props.site.ID !== nextProps.site.ID ) {
-			this.fetchIfEmpty( nextProps.site );
-			this.setState( this.getSettingsFromStore( nextProps.site ) );
-		}
-	}
-
-	getSettingsFromStore( siteInstance ) {
-		const site = siteInstance || this.props.site,
-			store = EarningsStore.getById( site.ID ) || {};
-
-		store.showEarningsNotice = false;
-		store.showWordadsInfo = false;
-		store.showSponsoredInfo = false;
-		store.showAdjustmentInfo = false;
-
-		return store;
-	}
-
-	resetState() {
-		this.setState( {
-			earnings: {
-				adjustment: {},
-				sponsored: {},
-				wordads: {},
-				total_amount_owed: '0.00',
-				total_earnings: '0.00',
-			},
-			isLoading: false,
-			error: {},
-			showEarningsNotice: false,
-			showWordadsInfo: false,
-			showSponsoredInfo: false,
-			showAdjustmentInfo: false,
-		} );
-	}
-
-	fetchIfEmpty( site ) {
-		site = site || this.props.site;
-		if ( ! site || ! site.ID ) {
-			return;
-		}
-
-		if ( EarningsStore.getById( site.ID ).earnings ) {
-			return;
-		}
-
-		// defer fetch requests to avoid dispatcher conflicts
-		setTimeout( () => WordadsActions.fetchEarnings( site ), 0 );
-	}
-
-	updateSettings = () => {
-		this.setState( this.getSettingsFromStore() );
+	/*
+	static propTypes = {
+		adsProgramName: PropTypes.string,
+		isRequestingWordadsStatus: PropTypes.bool.isRequired,
+		isUnsafe: PropTypes.oneOf( wordadsUnsafeValues ),
+		requestingWordAdsApproval: PropTypes.bool.isRequired,
+		requestWordAdsApproval: PropTypes.func.isRequired,
+		section: PropTypes.string.isRequired,
+		site: PropTypes.object,
+		wordAdsError: PropTypes.string,
+		wordAdsSuccess: PropTypes.bool,
+		// @TODO update these (copied from main.jsx)
 	};
+*/
 
 	handleEarningsNoticeToggle = event => {
 		event.preventDefault();
-		this.setState( {
-			showEarningsNotice: ! this.state.showEarningsNotice,
-		} );
 	};
 
 	handleInfoToggle = type => event => {
@@ -108,17 +48,18 @@ class AdsFormEarnings extends Component {
 		switch ( type ) {
 			case 'wordads':
 				this.setState( {
-					showWordadsInfo: ! this.state.showWordadsInfo,
+					showWordadsInfo: ! this.props.showWordadsInfo,
 				} );
+				console.log( this.props );
 				break;
 			case 'sponsored':
 				this.setState( {
-					showSponsoredInfo: ! this.state.showSponsoredInfo,
+					showSponsoredInfo: ! this.props.showSponsoredInfo,
 				} );
 				break;
 			case 'adjustment':
 				this.setState( {
-					showAdjustmentInfo: ! this.state.showAdjustmentInfo,
+					showAdjustmentInfo: ! this.props.showAdjustmentInfo,
 				} );
 				break;
 		}
@@ -126,9 +67,9 @@ class AdsFormEarnings extends Component {
 
 	getInfoToggle( type ) {
 		const types = {
-			wordads: this.state.showWordadsInfo,
-			sponsored: this.state.showSponsoredInfo,
-			adjustment: this.state.showAdjustmentInfo,
+			wordads: this.props.showWordadsInfo,
+			sponsored: this.props.showSponsoredInfo,
+			adjustment: this.props.showAdjustmentInfo,
 		};
 
 		return types[ type ] ? types[ type ] : false;
@@ -185,11 +126,9 @@ class AdsFormEarnings extends Component {
 	}
 
 	payoutNotice() {
-		const { translate } = this.props;
-		const owed =
-				this.state.earnings && this.state.earnings.total_amount_owed
-					? this.state.earnings.total_amount_owed
-					: '0.00',
+		const siteId = getSelectedSiteId( state );
+		const { earnings, translate } = this.props;
+		const owed = earnings && earnings.total_amount_owed ? earnings.total_amount_owed : '0.00',
 			notice = translate(
 				'Outstanding amount of $%(amountOwed)s does not exceed the minimum $100 needed to make the payment. ' +
 					'Payment will be made as soon as the total outstanding amount has reached $100.',
@@ -260,20 +199,13 @@ class AdsFormEarnings extends Component {
 	}
 
 	earningsBreakdown() {
-		const { numberFormat, translate } = this.props;
-		const earnings =
-				this.state.earnings && this.state.earnings.total_earnings
-					? Number( this.state.earnings.total_earnings )
-					: 0,
-			owed =
-				this.state.earnings && this.state.earnings.total_amount_owed
-					? Number( this.state.earnings.total_amount_owed )
-					: 0,
+		const { earnings, numberFormat, translate } = this.props;
+		const earnings_2 = // @TODO rename
+				earnings && earnings.total_earnings ? Number( earnings.total_earnings ) : 0,
+			owed = earnings && earnings.total_amount_owed ? Number( earnings.total_amount_owed ) : 0,
 			paid =
-				this.state.earnings &&
-				this.state.earnings.total_earnings &&
-				this.state.earnings.total_amount_owed
-					? this.state.earnings.total_earnings - this.state.earnings.total_amount_owed
+				earnings && earnings.total_earnings && earnings.total_amount_owed
+					? earnings.total_earnings - earnings.total_amount_owed
 					: 0;
 
 		return (
@@ -364,14 +296,18 @@ class AdsFormEarnings extends Component {
 	}
 
 	render() {
-		const { translate } = this.props;
-		const infoIcon = this.state.showEarningsNotice ? 'info' : 'info-outline',
+		const { earnings, translate } = this.props;
+		const siteId = getSelectedSiteId( state );
+		const infoIcon = true ? 'info' : 'info-outline',
 			classes = classNames( 'earnings_breakdown', {
-				'is-showing-info': this.state.showEarningsNotice,
+				'is-showing-info': this.props.showEarningsNotice,
 			} );
 
+		console.log( this.props );
 		return (
 			<div>
+				<QueryWordadsEarnings siteId={ siteId } />
+
 				<Card className={ classes }>
 					<div className="ads__module-header module-header">
 						<h1 className="ads__module-header-title module-header-title">
@@ -396,23 +332,19 @@ class AdsFormEarnings extends Component {
 						{ this.earningsBreakdown() }
 					</div>
 				</Card>
-				{ this.state.earnings && this.checkSize( this.state.earnings.wordads )
-					? this.earningsTable(
-							this.state.earnings.wordads,
-							translate( 'Earnings History' ),
-							'wordads'
-					  )
+				{ earnings && this.checkSize( earnings.wordads )
+					? this.earningsTable( earnings.wordads, translate( 'Earnings History' ), 'wordads' )
 					: null }
-				{ this.state.earnings && this.checkSize( this.state.earnings.sponsored )
+				{ earnings && this.checkSize( earnings.sponsored )
 					? this.earningsTable(
-							this.state.earnings.sponsored,
+							earnings.sponsored,
 							translate( 'Sponsored Content History' ),
 							'sponsored'
 					  )
 					: null }
-				{ this.state.earnings && this.checkSize( this.state.earnings.adjustment )
+				{ earnings && this.checkSize( earnings.adjustment )
 					? this.earningsTable(
-							this.state.earnings.adjustment,
+							earnings.adjustment,
 							translate( 'Adjustments History' ),
 							'adjustment'
 					  )
@@ -422,4 +354,13 @@ class AdsFormEarnings extends Component {
 	}
 }
 
-export default localize( AdsFormEarnings );
+export default connect( ( state, ownProps ) => {
+	const site = getSelectedSite( state );
+	const siteId = getSelectedSiteId( state );
+
+	return {
+		site,
+		siteId,
+		earnings: getWordAdsEarningsForSite( state, site ),
+	};
+} )( localize( AdsFormEarnings ) );
