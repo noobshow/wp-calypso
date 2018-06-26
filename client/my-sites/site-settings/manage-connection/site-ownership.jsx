@@ -23,6 +23,7 @@ import Gravatar from 'components/gravatar';
 import isJetpackSiteConnected from 'state/selectors/is-jetpack-site-connected';
 import isJetpackSiteInDevelopmentMode from 'state/selectors/is-jetpack-site-in-development-mode';
 import isJetpackUserMaster from 'state/selectors/is-jetpack-user-master';
+import OwnershipInformation from './ownership-information';
 import QueryJetpackConnection from 'components/data/query-jetpack-connection';
 import QueryJetpackUserConnection from 'components/data/query-jetpack-user-connection';
 import SectionHeader from 'components/section-header';
@@ -151,6 +152,8 @@ class SiteOwnership extends Component {
 					<FormLegend>{ translate( 'Site owner' ) }</FormLegend>
 					{ this.renderConnectionDetails() }
 				</FormFieldset>
+
+				<OwnershipInformation />
 			</Card>
 		);
 	}
