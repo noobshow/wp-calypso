@@ -1092,8 +1092,11 @@ class RegisterDomainStep extends React.Component {
 	};
 
 	showValidationErrorMessage( domain, error, errorData ) {
-		const { TRANSFERRABLE } = domainAvailability;
-		if ( TRANSFERRABLE === error && this.state.lastDomainIsTransferrable ) {
+		const { DOTBLOG_SUBDOMAIN, TRANSFERRABLE } = domainAvailability;
+		if (
+			( TRANSFERRABLE === error && this.state.lastDomainIsTransferrable ) ||
+			( this.props.isSignupStep && DOTBLOG_SUBDOMAIN === error )
+		) {
 			return;
 		}
 		this.setState( { showNotice: true, error, errorData } );
