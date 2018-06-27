@@ -107,4 +107,12 @@ export default {
 		},
 		defaultVariation: 'siteDeservesBoost',
 	},
+	includeDotBlogSubdomain: {
+		datestamp: '20180702',
+		variations: {
+			yes: 50,
+			no: 50,
+		},
+		defaultVariation: 'no',
+	},
 };
