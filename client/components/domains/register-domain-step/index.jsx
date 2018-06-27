@@ -107,7 +107,7 @@ function getQueryObject( props ) {
 		query: props.selectedSite.domain.split( '.' )[ 0 ],
 		quantity: SUGGESTION_QUANTITY,
 		vendor: searchVendor,
-		includeSubdomain: props.includeWordPressDotCom,
+		includeSubdomain: props.includeWordPressDotCom || props.includeDotBlogSubdomain,
 		surveyVertical: props.surveyVertical,
 	};
 }
@@ -207,7 +207,9 @@ class RegisterDomainStep extends React.Component {
 			lastDomainStatus: null,
 			lastDomainIsTransferrable: false,
 			loadingResults,
-			loadingSubdomainResults: this.props.includeWordPressDotCom && loadingResults,
+			loadingSubdomainResults:
+				( this.props.includeWordPressDotCom || this.props.includeDotBlogSubdomain ) &&
+				loadingResults,
 			showNotice: false,
 			pageNumber: 1,
 			searchResults: null,
@@ -277,7 +279,7 @@ class RegisterDomainStep extends React.Component {
 			if ( state.lastSurveyVertical && state.lastSurveyVertical !== this.props.surveyVertical ) {
 				state.loadingResults = true;
 
-				if ( this.props.includeWordPressDotCom ) {
+				if ( this.props.includeWordPressDotCom || this.props.includeDotBlogSubdomain ) {
 					state.loadingSubdomainResults = true;
 				}
 
