@@ -107,4 +107,12 @@ export default {
 		},
 		defaultVariation: 'siteDeservesBoost',
 	},
+	aboutSuggestionMatches: {
+		datestamp: '20180702',
+		variations: {
+			control: 50,
+			beginningAndEndOfWords: 50,
+		},
+		defaultVariation: 'control',
+	},
 };
